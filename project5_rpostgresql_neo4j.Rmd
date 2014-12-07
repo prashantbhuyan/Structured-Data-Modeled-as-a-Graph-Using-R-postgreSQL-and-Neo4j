@@ -1,0 +1,136 @@
+---
+title: "Project5_RPostgreSQL_RNeo4J"
+author: "Prashant B. Bhuyan"
+date: "December 6, 2014"
+output: pdf_document
+---
+
+In this project I will load data into a relational database from within R and then load that dataframe into neo4j as a graph database and then query that data from the neo4j browser.
+
+I'm loading trading data and will create nodes for orders and exchanges. Later for my final project I'll build off of this data model to analyze how orders are distributed between exchanges and sub accounts (or strategies) and how risk concentrates. I may be able to build a predictive model that tells me which strategies are about to go into a drawdown in my portfolio.
+
+Make Sure Neo4J Server Session is Running Before calling "http://localhost:7474/db/data/ with startGraph from RNeo4j.
+
+
+```{r}
+
+library(DBI)
+library(RPostgreSQL)
+library(RNeo4j)
+
+setwd("~/Documents")
+
+# Here I build the graph database to be populated later.
+
+graph = startGraph("http://localhost:7474/db/data/")
+
+# clear(graph)
+
+# Prompt . . . Answer Y
+
+# You are about to delete all nodes, relationships, indexes, and constraints from the  # # graph database. Are you sure? Y/N
+# 1: Y
+
+trades <- read.csv("account-summary-MRTTRADING1-20140918.csv")
+drv <- dbDriver("PostgreSQL")
+con <- dbConnect(drv, dbname = "postgres", host = "localhost", port = 5433, user = "postgres", password = "z8yjcpfw")
+dbWriteTable(con, "trades", trades)
+
+# save data from trades table to a data frame
+data <- dbGetQuery(con, "select * from trades")
+
+# check data 
+head(data)
+
+# save variables related to an order object into a data frame
+orders_data <- data[c('Account', 'Security', 'Order.ID', 'Side', 'Quantity', 'Route')]
+
+# check order_data
+head(orders_data)
+
+# save variables related to an exchange object into a data frame
+exchange_data <- data[c('Route')]
+
+# check exchange_data
+head(exchange_data)
+
+# save variables related to an account object into a data frame
+account_data <- data[c('Account')]
+
+# check account_data
+head(account_data)
+
+# save unique order id's into an orders object for the orders node. 
+order <- unique(orders_data$Order.ID)
+
+# check order
+head(order)
+
+# save unique account names into account object for the accounts node. 
+accounts <- unique(account_data$Account)
+
+# check accounts
+head(accounts)
+
+# save unique exchange names into the exchange object for the exchanges node.
+exchange <- unique(exchange_data$Route)
+
+# check exchange
+head(exchange)
+
+# load data into the neo4j graph and create the Orders node. 
+for(x in 1:length(order)){
+  createNode(graph, "Orders", order = order[x])
+  }
+
+# load data into the neo4j graph and create the Exchanges node. 
+for(x in 1:length(exchange)){
+  createNode(graph, "Exchanges", exchange = exchange[x])
+  }
+
+# query some orders from the data loaded to Neo4j into the order node
+getNodes(graph, "match n where n:Orders return n limit 5")
+
+# query some exchanges from the data loaded to Neo4j into the exchange node
+getNodes(graph, "match n where n:Exchanges return n limit 5")
+
+
+
+```
+
+The advantage of modeling the trade data above as a graph is that querying paths and relationships of large datasets can be performed in constant time thus paving the way for real time analytics.  Of course this particular transactional data are well structured and can be easily stored in a relational database.  However, performing analytical operations on any large sized dataset will be extremely inefficient in if that data are stored in a relational database.  
+
+Further, using R to manipulate and then push data back and forth between PostgreSQL and Neo4j makes it easy to visualize the data, to create and populate nodes and properties and to define relationships between nodes.  The drawback of modeling data as a graph is that neo4j is relatively new and so documentation on how to perform advanced tasks is somewhat scarce. Other than that I don't see much of a disadvantage to modeling transactional data as a graph.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
